@@ -1,0 +1,22 @@
+<application>
+  <name>Tutorial on inverse kinematic control system</name>
+
+  <module>
+      <name>yarplogger</name>
+      <parameters>--start</parameters>
+      <node>localhost</node>
+  </module>
+
+
+  <module>
+      <name>gzserver</name>
+      <parameters>-slibgazebo_yarp_clock.so iRonCub_Mk3_flight_1</parameters>
+      <node>localhost</node>
+  </module>
+
+   <module>
+      <name>gzclient</name>
+      <parameters></parameters>
+      <node>localhost</node>
+  </module>
+</application>

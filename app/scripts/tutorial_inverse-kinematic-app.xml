@@ -1,0 +1,20 @@
+<application>
+
+  <name>Tutorial on inverse kinematic control</name>
+
+  <dependencies>
+      <port>/yarplogger</port>
+      <port>/icubSim/right_leg/stateExt:o</port>
+      <port>/icubSim/left_leg/stateExt:o</port>
+      <port>/icubSim/right_arm/stateExt:o</port>
+      <port>/icubSim/left_arm/stateExt:o</port>
+      <port>/icubSim/torso/stateExt:o</port>
+  </dependencies>
+
+  <module>
+      <name>tutorial_inverse-kinematic</name>
+      <environment>YARP_FORWARD_LOG_ENABLE=1;YARP_CLOCK=/clock;YARP_ROBOT_NAME=iRonCub-Mk3_Gazebo</environment>
+      <node>localhost</node>
+  </module>
+
+</application>
