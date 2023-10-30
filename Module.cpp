@@ -49,6 +49,23 @@ void convertRadToDeg(const yarp::sig::Vector& vecRad, yarp::sig::Vector& vecDeg)
     }
 }
 
+void copyYarpVector(const yarp::sig::Vector &vecOriginal, yarp::sig::Vector &vecCopy)
+{
+    // Copies the elements of a YARP vector into another one
+    std::cout << "copyYarpVector: " << vecOriginal.size() << " " << vecCopy.size() << std::endl;
+    if (vecCopy.size() != vecOriginal.size())
+    {
+        yError() << "copyYarpVector: wrong vector size";
+        // exit on error
+        exit(1);
+    }
+
+    for (size_t i = 0; i < vecOriginal.size(); i++)
+    {
+        vecCopy[i] = vecOriginal[i];
+    }
+}
+
 double Module::getPeriod () { return 0.01; }
 
 bool Module::updateModule ()
@@ -80,20 +97,15 @@ bool Module::updateModule ()
 
     kinDynModel.setRobotState(w_H_b, jointPos, baseVel, jointVelSetToZero, gravity);
 
-    // The computeGeneralizedGravityForces method is computing the g(q) term, for both the base and the joint
-    iDynTree::FreeFloatingGeneralizedTorques g_q(kinDynModel.model());
-    kinDynModel.generalizedGravityForces(g_q);
-
-    // We extract the joint part to a YARP vector
-    iDynTree::toYarp(g_q.jointTorques(), gravityCompensation);
-
     //compute control
+    delta_time = yarp::os::Time::now() - time_zero;
     for (size_t i = 0; i < positionsInRad.size(); i++) {
-        errorInRad(i) = referencePositionsInRad(i) - positionsInRad(i);
-        torquesInNm(i) = gravityCompensation(i) + kp(i) * errorInRad(i) - kd(i) * velocitiesInRadS(i);
+        referenceJointPositions(i) = zeroJointPositions(i) + 10 * sin(2 * M_PI * delta_time / 20);
     }
 
-    itrq->setRefTorques(torquesInNm.data());
+    std::cout << "delta_time : " << delta_time << " | joint pos: " << referenceJointPositions(0) << " | pos meas: " << positionsInDeg(0)  << std::endl; 
+
+    ipos->setPositions(referenceJointPositions.data());
 
     return true;
 }
@@ -178,7 +190,7 @@ bool Module::configure (yarp::os::ResourceFinder &rf)
     ok=ok && robotDevice.view(ilim);
     ok=ok && robotDevice.view(ienc);
     ok=ok && robotDevice.view(imod);
-    ok=ok && robotDevice.view(itrq);
+    ok=ok && robotDevice.view(ipos);
 
     if (!ok) {
         yError()<<"Unable to open interfaces";
@@ -221,12 +233,12 @@ bool Module::configure (yarp::os::ResourceFinder &rf)
 
     std::cout << "Number of DOFs: " << actuatedDOFs << "\n";
 
+    referenceJointPositions.resize(actuatedDOFs, 0.0); // deg
+    zeroJointPositions.resize(actuatedDOFs, 0.0); // deg
     positionsInDeg.resize(actuatedDOFs, 0.0);
     positionsInRad.resize(actuatedDOFs, 0.0);
     velocitiesInDegS.resize(actuatedDOFs, 0.0);
     velocitiesInRadS.resize(actuatedDOFs, 0.0);
-    gravityCompensation.resize(actuatedDOFs, 0.0);
-    referencePositionsInRad.resize(actuatedDOFs, 0.0);
 
     // Make sure that we are reading data from the robot before proceeding
     bool readEncoderSuccess = false;
@@ -242,53 +254,22 @@ bool Module::configure (yarp::os::ResourceFinder &rf)
         return false;
     }
 
-    convertDegToRad(positionsInDeg, referencePositionsInRad);
-
-    iDynTree::IJointConstPtr joint = model.getJoint(model.getJointIndex("l_shoulder_pitch"));
-    if (!joint) {
-        std::cout << "Could not retrieve index of l_shoulder_pitch.\n";
-        return false;
-    }
-    referencePositionsInRad(joint->getDOFsOffset()) += 1.5;
-
-    joint = model.getJoint(model.getJointIndex("l_elbow"));
-    if (!joint) {
-        std::cout << "Could not retrieve index of l_elbow.\n";
-        return false;
-    }
-    referencePositionsInRad(joint->getDOFsOffset()) += 1.5;
-
-    joint = model.getJoint(model.getJointIndex("r_shoulder_pitch"));
-    if (!joint) {
-        std::cout << "Could not retrieve index of r_shoulder_pitch.\n";
-        return false;
-    }
-    referencePositionsInRad(joint->getDOFsOffset()) += 1.5;
-
-    joint = model.getJoint(model.getJointIndex("r_elbow"));
-    if (!joint) {
-        std::cout << "Could not retrieve index of r_elbow.\n";
-        return false;
-    }
-    referencePositionsInRad(joint->getDOFsOffset()) += 1.5;
-
     //write
-    errorInRad.resize(actuatedDOFs, 0.0);
-
     kp.resize(actuatedDOFs, 1.5);
     kd.resize(actuatedDOFs, 0.5);
-
-    torquesInNm.resize(actuatedDOFs, 0.0);
-
     zeroDofs.resize(actuatedDOFs, 0.0);
     baseZeroDofs.resize(6, 0.0);
-
     grav.resize(3, 0.0);
     grav(2) = -9.81;
+    time_zero = yarp::os::Time::now();
+    delta_time = 0;
+
+    copyYarpVector(positionsInDeg, zeroJointPositions);
+
 
     // Setting the control mode of all the controlled joints to torque control mode
     // See http://wiki.icub.org/wiki/Control_Modes for more info about the control modes
-    std::vector<int> ctrlModes(actuatedDOFs, VOCAB_CM_TORQUE);
+    std::vector<int> ctrlModes(actuatedDOFs, VOCAB_CM_POSITION_DIRECT);
     imod->setControlModes(ctrlModes.data());
 
     return true;
