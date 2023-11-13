@@ -2,6 +2,10 @@
 
 #include <cmath>
 
+#include <iDynTree/Core/MatrixFixSize.h>
+#include <iDynTree/Core/Transform.h>
+#include <iostream>
+#include <yarp/dev/IControlMode.h>
 #include <yarp/os/ResourceFinder.h>
 #include <yarp/os/Property.h>
 #include <yarp/sig/Vector.h>
@@ -13,6 +17,10 @@
 #include <iDynTree/Model/Model.h>
 #include <iDynTree/ModelIO/ModelLoader.h>
 #include <iDynTree/yarp/YARPConversions.h>
+#include <iDynTree/Core/EigenHelpers.h>
+#include <iDynTree/yarp/YARPEigenConversions.h>
+
+#include <QP.h>
 
 void addVectorOfStringToProperty(yarp::os::Property& prop, std::string key, std::vector<std::string> & list)
 {
@@ -83,29 +91,63 @@ bool Module::updateModule ()
     // We are considering the "fixed base" case, i.e. the base is always fixed to the ground
     iDynTree::Transform w_H_b = iDynTree::Transform::Identity(); //identity + zero vector
     iDynTree::Twist baseVel = iDynTree::Twist::Zero();
-    iDynTree::VectorDynSize jointPos(positionsInRad.size()), jointVelSetToZero(velocitiesInRadS.size());
-    jointVelSetToZero.zero();
 
-    // Convert measured values to iDynTree quantities
     iDynTree::toiDynTree(positionsInRad, jointPos);
-
-    // Set all other input quantities of the inverse dynamics to zero
+    iDynTree::toiDynTree(velocitiesInRadS, jointVel);
 
     iDynTree::Vector3 gravity;
     gravity.zero();
     gravity(2) = -9.81;
+    kinDynModel.setRobotState(w_H_b, jointPos, baseVel, jointVel, gravity);
 
-    kinDynModel.setRobotState(w_H_b, jointPos, baseVel, jointVelSetToZero, gravity);
+    //compute J_ee_pos
+    iDynTree::FrameIndex frameIndex_ee = kinDynModel.getFrameIndex(frameName_ee);
+    kinDynModel.getFrameFreeFloatingJacobian(frameIndex_ee, J_ee);
+    J_ee_pos = iDynTree::toEigen(J_ee).block(0, 0, 3, kinDynModel.getNrOfDegreesOfFreedom() + 6);
+    //compute J_base
+    iDynTree::FrameIndex frameIndex_base = kinDynModel.getFrameIndex(frameName_base);
+    kinDynModel.getFrameFreeFloatingJacobian(frameIndex_base, J_base);
+    //compute w_p_ee
+    iDynTree::Transform world_T_ee = kinDynModel.getWorldTransform(frameIndex_ee);
+    w_p_ee = world_T_ee.getPosition();
 
+
+    qp_problem.computeHessian(hessianDense, J_ee_pos, 1);
+    qp_problem.computeGradient(gradient, J_ee_pos, w_p_ee - w_p_ee_des);
+    qp_problem.computeLinearConstraintsMatrix(linearMatrixDense, J_base);
+    qp_problem.computeBounds(lowerBound, upperBound, 0.10);
+
+    hessian = hessianDense.sparseView();
+    linearMatrix = linearMatrixDense.sparseView();
+
+    if (!solver.updateHessianMatrix(hessian))
+        return false;
+    if (!solver.updateGradient(gradient))
+        return false;
+    if (!solver.updateLinearConstraintsMatrix(linearMatrix))
+        return false;
+    if (!solver.updateBounds(lowerBound, upperBound))
+        return false;
+    if (solver.solveProblem() != OsqpEigen::ErrorExitFlag::NoError)
+        return false;
+
+    // Link yarp and eigen QP output vectors using the Eigen Map
+    Eigen::Map<Eigen::VectorXd> outputQP = iDynTree::toEigen(outputQP_yarp);
+    outputQP = solver.getSolution();
+
+    // std::cout << "outputQP: " << outputQP << std::endl;
+    // std::cout << "outputQP_yarp: " << outputQP_yarp.toString() << std::endl;
+    
     //compute control
-    delta_time = yarp::os::Time::now() - time_zero;
+    referenceJointVelocities = outputQP_yarp.subVector(6, kinDynModel.getNrOfDegreesOfFreedom() + 6 - 1) * 180.0 / M_PI;
     for (size_t i = 0; i < positionsInRad.size(); i++) {
-        referenceJointPositions(i) = zeroJointPositions(i) + 10 * sin(2 * M_PI * delta_time / 20);
+        referenceJointPositions(i) = old_referenceJointPositions(i) + referenceJointVelocities(i) * delta_time;
     }
 
-    std::cout << "delta_time : " << delta_time << " | joint pos: " << referenceJointPositions(0) << " | pos meas: " << positionsInDeg(0)  << std::endl; 
+    std::cout << "error pos" << (w_p_ee - w_p_ee_des).toString() << " norm: " << iDynTree::toEigen(w_p_ee - w_p_ee_des).norm() << std::endl;
 
     ipos->setPositions(referenceJointPositions.data());
+    copyYarpVector(referenceJointPositions, old_referenceJointPositions);
 
     return true;
 }
@@ -234,7 +276,9 @@ bool Module::configure (yarp::os::ResourceFinder &rf)
     std::cout << "Number of DOFs: " << actuatedDOFs << "\n";
 
     referenceJointPositions.resize(actuatedDOFs, 0.0); // deg
+    referenceJointVelocities.resize(actuatedDOFs, 0.0); // deg/s
     zeroJointPositions.resize(actuatedDOFs, 0.0); // deg
+    old_referenceJointPositions.resize(actuatedDOFs, 0.0); // deg
     positionsInDeg.resize(actuatedDOFs, 0.0);
     positionsInRad.resize(actuatedDOFs, 0.0);
     velocitiesInDegS.resize(actuatedDOFs, 0.0);
@@ -256,21 +300,83 @@ bool Module::configure (yarp::os::ResourceFinder &rf)
 
     //write
     kp.resize(actuatedDOFs, 1.5);
-    kd.resize(actuatedDOFs, 0.5);
-    zeroDofs.resize(actuatedDOFs, 0.0);
-    baseZeroDofs.resize(6, 0.0);
     grav.resize(3, 0.0);
     grav(2) = -9.81;
     time_zero = yarp::os::Time::now();
-    delta_time = 0;
+    delta_time = Module::getPeriod();
 
     copyYarpVector(positionsInDeg, zeroJointPositions);
+    copyYarpVector(positionsInDeg, old_referenceJointPositions);
 
 
     // Setting the control mode of all the controlled joints to torque control mode
     // See http://wiki.icub.org/wiki/Control_Modes for more info about the control modes
     std::vector<int> ctrlModes(actuatedDOFs, VOCAB_CM_POSITION_DIRECT);
     imod->setControlModes(ctrlModes.data());
+
+    //compute QP quantities
+    hessian.resize(kinDynModel.getNrOfDegreesOfFreedom() + 6, kinDynModel.getNrOfDegreesOfFreedom() + 6);
+    hessianDense.resize(kinDynModel.getNrOfDegreesOfFreedom() + 6, kinDynModel.getNrOfDegreesOfFreedom() + 6);
+    linearMatrix.resize(6, kinDynModel.getNrOfDegreesOfFreedom() + 6);
+    linearMatrixDense.resize(6 + kinDynModel.getNrOfDegreesOfFreedom(), kinDynModel.getNrOfDegreesOfFreedom() + 6);
+    gradient.resize(kinDynModel.getNrOfDegreesOfFreedom() + 6);
+    lowerBound.resize(6 + kinDynModel.getNrOfDegreesOfFreedom());
+    upperBound.resize(6 + kinDynModel.getNrOfDegreesOfFreedom());
+
+    hessianDense.setZero();
+    linearMatrixDense.setZero();
+    gradient.setZero();
+    lowerBound.setZero();
+    upperBound.setZero();
+
+    //compute J_ee_pos
+    frameName_ee = "l_arm_jet_turbine";
+    iDynTree::FrameIndex frameIndex_ee = kinDynModel.getFrameIndex(frameName_ee);
+    J_ee.resize(6, kinDynModel.getNrOfDegreesOfFreedom() + 6);
+    kinDynModel.getFrameFreeFloatingJacobian(frameIndex_ee, J_ee);
+    J_ee_pos.resize(3, kinDynModel.getNrOfDegreesOfFreedom() + 6);
+    J_ee_pos = iDynTree::toEigen(J_ee).block(3, 0, 3, kinDynModel.getNrOfDegreesOfFreedom() + 6);
+    //compute J_base
+    frameName_base = "base_link";
+    iDynTree::FrameIndex frameIndex_base = kinDynModel.getFrameIndex(frameName_base);
+    J_base.resize(6, kinDynModel.getNrOfDegreesOfFreedom() + 6);
+    kinDynModel.getFrameFreeFloatingJacobian(frameIndex_base, J_base);
+    //compute w_p_ee
+    iDynTree::Transform world_T_ee = kinDynModel.getWorldTransform(frameIndex_ee);
+    w_p_ee = world_T_ee.getPosition();
+    //set w_p_ee_des
+    w_p_ee_des = iDynTree::Position(w_p_ee(0) + 0.2, 0.0, w_p_ee(2)+ 0.1);
+
+
+    std::cout << "error pos" << (w_p_ee - w_p_ee_des).toString() << " norm: " << iDynTree::toEigen(w_p_ee - w_p_ee_des).norm() << std::endl;
+
+
+    qp_problem.computeHessian(hessianDense, J_ee_pos,  0.0);
+    qp_problem.computeGradient(gradient, J_ee_pos, w_p_ee - w_p_ee_des);
+    qp_problem.computeLinearConstraintsMatrix(linearMatrixDense, J_base);
+    qp_problem.computeBounds(lowerBound, upperBound, 0.0);
+
+    hessian = hessianDense.sparseView();
+    linearMatrix = linearMatrixDense.sparseView();
+
+    solver.settings()->setWarmStart(true);
+    solver.settings()->setVerbosity(false);
+    solver.data()->setNumberOfVariables(gradient.size());
+    solver.data()->setNumberOfConstraints(lowerBound.size());
+    if (!solver.data()->setHessianMatrix(hessian))
+        return false;
+    if (!solver.data()->setGradient(gradient))
+        return false;
+    if (!solver.data()->setLinearConstraintsMatrix(linearMatrix))
+        return false;
+    if (!solver.data()->setLowerBound(lowerBound))
+        return false;
+    if (!solver.data()->setUpperBound(upperBound))
+        return false;
+    if (!solver.initSolver())
+        return false;
+
+    outputQP_yarp.resize(gradient.size());
 
     return true;
 }
