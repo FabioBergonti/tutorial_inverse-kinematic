@@ -14,3 +14,8 @@ $$
 & v^{\star} = -K_p \left( x_{ee} - x_{ee}^{des} \right)
 \end{align}
 $$
+
+$\nu$ is the vector of configuration velocities, $v_b$ is the base velocity, $\dot{s}$ is the joint velocity.
+$J_{ee}^{pos}$ is the Jacobian of the end effector position, $J_B$ is the Jacobian of the base.
+$\dot{s}^{-}$ and $\dot{s}^{+}$ are the lower and upper bounds on the joint velocity.
+$x_{ee}$ is the end effector position and $x_{ee}^{des}$ is the desired end effector position, and $K_p$ is the proportional gain.
