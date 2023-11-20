@@ -332,7 +332,7 @@ bool Module::configure (yarp::os::ResourceFinder &rf)
     //compute w_p_ee
     w_p_ee = robot.getWorldTransform(frameName_ee).getPosition();
     //set w_p_ee_des
-    w_p_ee_des = iDynTree::Position(w_p_ee(0) + 0.2, 0.0, w_p_ee(2)+ 0.1);
+    w_p_ee_des = iDynTree::Position(w_p_ee(0) + 0.2, 0.0, w_p_ee(2) + 0.2);
 
     std::cout << "error pos" << (w_p_ee - w_p_ee_des).toString() << " norm: " << iDynTree::toEigen(w_p_ee - w_p_ee_des).norm() << std::endl;
 
