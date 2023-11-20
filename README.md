@@ -19,3 +19,27 @@ $\nu$ is the vector of configuration velocities, $v_b$ is the base velocity, $\d
 $J_{ee}^{pos}$ is the Jacobian of the end effector position, $J_B$ is the Jacobian of the base.
 $\dot{s}^{-}$ and $\dot{s}^{+}$ are the lower and upper bounds on the joint velocity.
 $x_{ee}$ is the end effector position and $x_{ee}^{des}$ is the desired end effector position, and $K_p$ is the proportional gain.
+
+## Installation
+
+- Install and Configure [ironcub-mk1-software](https://github.com/ami-iit/ironcub-mk1-software)
+- Build the repository
+```bash
+mkdir build
+cd build
+cmake ..
+make install
+```
+
+## Usage
+
+- run yarpserver
+```bash
+yarpserver
+```
+- run yarpmanager
+```bash
+yarpmanager
+```
+- open the application `tutorial_inverse-kinematic-system.xml` in yarpmanager and run all the modules
+- open the application `tutorial_inverse-kinematic-app.xml` in yarpmanager and run the controller

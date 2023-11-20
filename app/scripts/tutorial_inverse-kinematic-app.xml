@@ -13,7 +13,7 @@
 
   <module>
       <name>tutorial_inverse-kinematic</name>
-      <environment>YARP_FORWARD_LOG_ENABLE=1;YARP_CLOCK=/clock;YARP_ROBOT_NAME=iRonCub-Mk3_Gazebo</environment>
+      <environment>YARP_FORWARD_LOG_ENABLE=1;YARP_CLOCK=/clock;YARP_ROBOT_NAME=iRonCub-Mk1_Gazebo</environment>
       <node>localhost</node>
   </module>
 
