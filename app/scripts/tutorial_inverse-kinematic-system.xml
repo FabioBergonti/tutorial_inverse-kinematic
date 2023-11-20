@@ -10,7 +10,7 @@
 
   <module>
       <name>gzserver</name>
-      <parameters>-slibgazebo_yarp_clock.so iRonCub_Mk3_flight_1</parameters>
+      <parameters>-slibgazebo_yarp_clock.so iRonCub_Mk1_world</parameters>
       <node>localhost</node>
   </module>
 
