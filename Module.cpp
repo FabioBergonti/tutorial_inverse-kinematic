@@ -1,9 +1,11 @@
+#include "Robot.h"
 #include <Module.h>
 
 #include <cmath>
 
 #include <iDynTree/Core/MatrixFixSize.h>
 #include <iDynTree/Core/Transform.h>
+#include <iDynTree/Core/Twist.h>
 #include <iostream>
 #include <yarp/dev/IControlMode.h>
 #include <yarp/os/ResourceFinder.h>
@@ -19,8 +21,6 @@
 #include <iDynTree/yarp/YARPConversions.h>
 #include <iDynTree/Core/EigenHelpers.h>
 #include <iDynTree/yarp/YARPEigenConversions.h>
-
-#include <QP.h>
 
 void addVectorOfStringToProperty(yarp::os::Property& prop, std::string key, std::vector<std::string> & list)
 {
@@ -60,7 +60,6 @@ void convertRadToDeg(const yarp::sig::Vector& vecRad, yarp::sig::Vector& vecDeg)
 void copyYarpVector(const yarp::sig::Vector &vecOriginal, yarp::sig::Vector &vecCopy)
 {
     // Copies the elements of a YARP vector into another one
-    std::cout << "copyYarpVector: " << vecOriginal.size() << " " << vecCopy.size() << std::endl;
     if (vecCopy.size() != vecOriginal.size())
     {
         yError() << "copyYarpVector: wrong vector size";
@@ -92,29 +91,18 @@ bool Module::updateModule ()
     iDynTree::Transform w_H_b = iDynTree::Transform::Identity(); //identity + zero vector
     iDynTree::Twist baseVel = iDynTree::Twist::Zero();
 
-    iDynTree::toiDynTree(positionsInRad, jointPos);
-    iDynTree::toiDynTree(velocitiesInRadS, jointVel);
-
-    iDynTree::Vector3 gravity;
-    gravity.zero();
-    gravity(2) = -9.81;
-    kinDynModel.setRobotState(w_H_b, jointPos, baseVel, jointVel, gravity);
+    robot.setState(w_H_b,baseVel, positionsInRad, velocitiesInRadS);
 
     //compute J_ee_pos
-    iDynTree::FrameIndex frameIndex_ee = kinDynModel.getFrameIndex(frameName_ee);
-    kinDynModel.getFrameFreeFloatingJacobian(frameIndex_ee, J_ee);
-    J_ee_pos = iDynTree::toEigen(J_ee).block(0, 0, 3, kinDynModel.getNrOfDegreesOfFreedom() + 6);
-    //compute J_base
-    iDynTree::FrameIndex frameIndex_base = kinDynModel.getFrameIndex(frameName_base);
-    kinDynModel.getFrameFreeFloatingJacobian(frameIndex_base, J_base);
+    J_ee_pos.resize(3, kinDynModel.getNrOfDegreesOfFreedom() + 6);
+    J_ee_pos = iDynTree::toEigen(robot.getJacobian(frameName_ee)).block(0, 0, 3, kinDynModel.getNrOfDegreesOfFreedom() + 6);
     //compute w_p_ee
-    iDynTree::Transform world_T_ee = kinDynModel.getWorldTransform(frameIndex_ee);
-    w_p_ee = world_T_ee.getPosition();
+    w_p_ee = robot.getWorldTransform(frameName_ee).getPosition();
 
 
     qp_problem.computeHessian(hessianDense, J_ee_pos, 1);
     qp_problem.computeGradient(gradient, J_ee_pos, w_p_ee - w_p_ee_des);
-    qp_problem.computeLinearConstraintsMatrix(linearMatrixDense, J_base);
+    qp_problem.computeLinearConstraintsMatrix(linearMatrixDense, robot.getJacobian(frameName_base));
     qp_problem.computeBounds(lowerBound, upperBound, 0.10);
 
     hessian = hessianDense.sparseView();
@@ -141,7 +129,7 @@ bool Module::updateModule ()
     //compute control
     referenceJointVelocities = outputQP_yarp.subVector(6, kinDynModel.getNrOfDegreesOfFreedom() + 6 - 1) * 180.0 / M_PI;
     for (size_t i = 0; i < positionsInRad.size(); i++) {
-        referenceJointPositions(i) = old_referenceJointPositions(i) + referenceJointVelocities(i) * delta_time;
+        referenceJointPositions(i) = old_referenceJointPositions(i) + referenceJointVelocities(i) *  Module::getPeriod();
     }
 
     std::cout << "error pos" << (w_p_ee - w_p_ee_des).toString() << " norm: " << iDynTree::toEigen(w_p_ee - w_p_ee_des).norm() << std::endl;
@@ -269,6 +257,11 @@ bool Module::configure (yarp::os::ResourceFinder &rf)
 
     const iDynTree::Model& model = kinDynModel.model();
 
+    iDynTree::Vector3 gravity;
+    gravity.zero();
+    gravity(2) = -9.81;
+    robot.configure(modelFullPath, axesList, gravity);
+
     ///////////////////////////////////////////////////////////////
     //// Resize buffers
     ///////////////////////////////////////////////////////////////
@@ -298,12 +291,16 @@ bool Module::configure (yarp::os::ResourceFinder &rf)
         return false;
     }
 
+    //read state
+    convertDegToRad(positionsInDeg, positionsInRad);
+    convertDegToRad(velocitiesInDegS, velocitiesInRadS);
+    iDynTree::Transform w_H_b = iDynTree::Transform::Identity(); //identity + zero vector
+    iDynTree::Twist baseVel = iDynTree::Twist::Zero();
+
+    robot.setState(w_H_b, baseVel, positionsInRad, velocitiesInRadS);
+
     //write
-    kp.resize(actuatedDOFs, 1.5);
-    grav.resize(3, 0.0);
-    grav(2) = -9.81;
     time_zero = yarp::os::Time::now();
-    delta_time = Module::getPeriod();
 
     copyYarpVector(positionsInDeg, zeroJointPositions);
     copyYarpVector(positionsInDeg, old_referenceJointPositions);
@@ -330,30 +327,19 @@ bool Module::configure (yarp::os::ResourceFinder &rf)
     upperBound.setZero();
 
     //compute J_ee_pos
-    frameName_ee = "l_arm_jet_turbine";
-    iDynTree::FrameIndex frameIndex_ee = kinDynModel.getFrameIndex(frameName_ee);
-    J_ee.resize(6, kinDynModel.getNrOfDegreesOfFreedom() + 6);
-    kinDynModel.getFrameFreeFloatingJacobian(frameIndex_ee, J_ee);
     J_ee_pos.resize(3, kinDynModel.getNrOfDegreesOfFreedom() + 6);
-    J_ee_pos = iDynTree::toEigen(J_ee).block(3, 0, 3, kinDynModel.getNrOfDegreesOfFreedom() + 6);
-    //compute J_base
-    frameName_base = "base_link";
-    iDynTree::FrameIndex frameIndex_base = kinDynModel.getFrameIndex(frameName_base);
-    J_base.resize(6, kinDynModel.getNrOfDegreesOfFreedom() + 6);
-    kinDynModel.getFrameFreeFloatingJacobian(frameIndex_base, J_base);
+    J_ee_pos = iDynTree::toEigen(robot.getJacobian(frameName_ee)).block(0, 0, 3, kinDynModel.getNrOfDegreesOfFreedom() + 6);
     //compute w_p_ee
-    iDynTree::Transform world_T_ee = kinDynModel.getWorldTransform(frameIndex_ee);
-    w_p_ee = world_T_ee.getPosition();
+    w_p_ee = robot.getWorldTransform(frameName_ee).getPosition();
     //set w_p_ee_des
     w_p_ee_des = iDynTree::Position(w_p_ee(0) + 0.2, 0.0, w_p_ee(2)+ 0.1);
-
 
     std::cout << "error pos" << (w_p_ee - w_p_ee_des).toString() << " norm: " << iDynTree::toEigen(w_p_ee - w_p_ee_des).norm() << std::endl;
 
 
     qp_problem.computeHessian(hessianDense, J_ee_pos,  0.0);
     qp_problem.computeGradient(gradient, J_ee_pos, w_p_ee - w_p_ee_des);
-    qp_problem.computeLinearConstraintsMatrix(linearMatrixDense, J_base);
+    qp_problem.computeLinearConstraintsMatrix(linearMatrixDense, robot.getJacobian(frameName_base));
     qp_problem.computeBounds(lowerBound, upperBound, 0.0);
 
     hessian = hessianDense.sparseView();

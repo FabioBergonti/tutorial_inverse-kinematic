@@ -3,6 +3,9 @@
 
 #include <iDynTree/Core/MatrixDynSize.h>
 #include <iDynTree/Core/Position.h>
+#include <iDynTree/Core/VectorDynSize.h>
+#include <iDynTree/KinDynComputations.h>
+
 #include <yarp/os/RFModule.h>
 #include <yarp/sig/Vector.h>
 
@@ -14,13 +17,11 @@
 #include <yarp/dev/IPositionDirect.h>
 #include <yarp/dev/PolyDriver.h>
 
-#include <iDynTree/Core/VectorDynSize.h>
-#include <iDynTree/KinDynComputations.h>
-
 #include <Eigen/Dense>
 #include <OsqpEigen/OsqpEigen.h>
 
 #include <QP.h>
+#include <Robot.h>
 
 class Module : public yarp::os::RFModule
 {
@@ -41,33 +42,21 @@ class Module : public yarp::os::RFModule
     yarp::sig::Vector velocitiesInRadS;
     yarp::sig::Vector positionsInDeg;
     yarp::sig::Vector velocitiesInDegS;
-
     yarp::sig::Vector outputQP_yarp;
 
-
     //write
-    yarp::sig::Vector kp; // Nm/rad
     yarp::sig::Vector referenceJointPositions; // deg
     yarp::sig::Vector referenceJointVelocities; // deg/s
     yarp::sig::Vector zeroJointPositions; // deg
     yarp::sig::Vector old_referenceJointPositions; // deg
-    yarp::sig::Vector grav;
     double time_zero;
-    double delta_time;
 
-    iDynTree::VectorDynSize jointPos;
-    iDynTree::VectorDynSize jointVel;
-    iDynTree::Position w_p_com;
-    iDynTree::MatrixDynSize J_com;
-    iDynTree::MatrixDynSize J_ee;
     iDynTree::MatrixDynSize J_ee_pos;
-    iDynTree::MatrixDynSize J_base;
     iDynTree::Position w_p_ee;
-    iDynTree::Position w_p_base;
     iDynTree::Position w_p_ee_des;
 
-    std::string frameName_base;
-    std::string frameName_ee;
+    const std::string frameName_base {"base_link"};
+    const std::string frameName_ee {"r_arm_jet_turbine"};
 
     Eigen::SparseMatrix<double> hessian;
     Eigen::SparseMatrix<double> linearMatrix;
@@ -80,6 +69,8 @@ class Module : public yarp::os::RFModule
     // Instantiate OSQP solver
     OsqpEigen::Solver solver;
     QPControlProblem qp_problem;
+
+    Robot robot;
 
 public:
     virtual double getPeriod ();
