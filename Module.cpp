@@ -261,8 +261,6 @@ bool Module::configure (yarp::os::ResourceFinder &rf)
     gravity.zero();
     gravity(2) = -9.81;
     robot.configure(modelFullPath, axesList, gravity);
-    // std::cout << "robot.jointPos: " << robot.getJointPos().toString() << std::endl;
-    // std::cout << "robot.baseVel: " << robot.getBaseVel().toString() << std::endl;
 
     ///////////////////////////////////////////////////////////////
     //// Resize buffers
