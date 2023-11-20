@@ -41,6 +41,7 @@ class Robot
         iDynTree::Twist getBaseVel(){return _baseVel;}
         iDynTree::MatrixDynSize getJacobian(std::string frameName);
         iDynTree::Transform getWorldTransform(std::string frameName);
+        unsigned int getNrOfDegreesOfFreedom(){return _kinDynModel.getNrOfDegreesOfFreedom();};
 
 
     private:

@@ -25,9 +25,6 @@
 
 class Module : public yarp::os::RFModule
 {
-    // Class to compute model quantities
-    iDynTree::KinDynComputations kinDynModel;
-
     // Attributes to communicate with the robot YARP-based interface
     yarp::dev::PolyDriver robotDevice;
 

@@ -94,8 +94,8 @@ bool Module::updateModule ()
     robot.setState(w_H_b,baseVel, positionsInRad, velocitiesInRadS);
 
     //compute J_ee_pos
-    J_ee_pos.resize(3, kinDynModel.getNrOfDegreesOfFreedom() + 6);
-    J_ee_pos = iDynTree::toEigen(robot.getJacobian(frameName_ee)).block(0, 0, 3, kinDynModel.getNrOfDegreesOfFreedom() + 6);
+    J_ee_pos.resize(3, robot.getNrOfDegreesOfFreedom() + 6);
+    J_ee_pos = iDynTree::toEigen(robot.getJacobian(frameName_ee)).block(0, 0, 3, robot.getNrOfDegreesOfFreedom() + 6);
     //compute w_p_ee
     w_p_ee = robot.getWorldTransform(frameName_ee).getPosition();
 
@@ -127,7 +127,7 @@ bool Module::updateModule ()
     // std::cout << "outputQP_yarp: " << outputQP_yarp.toString() << std::endl;
     
     //compute control
-    referenceJointVelocities = outputQP_yarp.subVector(6, kinDynModel.getNrOfDegreesOfFreedom() + 6 - 1) * 180.0 / M_PI;
+    referenceJointVelocities = outputQP_yarp.subVector(6, robot.getNrOfDegreesOfFreedom() + 6 - 1) * 180.0 / M_PI;
     for (size_t i = 0; i < positionsInRad.size(); i++) {
         referenceJointPositions(i) = old_referenceJointPositions(i) + referenceJointVelocities(i) *  Module::getPeriod();
     }
@@ -238,25 +238,6 @@ bool Module::configure (yarp::os::ResourceFinder &rf)
 
     std::string modelFullPath = rf.findFileByName("model.urdf");
 
-    // We use the iDynTree::ModelLoader class to extract from the URDF file
-    // a model containing only the joint we are interested in controlling, and
-    // in the same order with which we configured the remotecontrolboardremapper
-    // device, to avoid complicated remapping between the vectors used in the YARP
-    // devices and the one used by the iDynTree model .
-    iDynTree::ModelLoader mdlLoader;
-    ok = mdlLoader.loadReducedModelFromFile(modelFullPath, axesList);
-
-    // Once we loaded the model, we pass it to the KinDynComputations class to
-    // compute dynamics quantities such as the vector of gravity torques
-    ok = ok && kinDynModel.loadRobotModel(mdlLoader.model());
-
-    if (!ok) {
-        yError()<<"Unable to open model " << modelFullPath;
-        return false;
-    }
-
-    const iDynTree::Model& model = kinDynModel.model();
-
     iDynTree::Vector3 gravity;
     gravity.zero();
     gravity(2) = -9.81;
@@ -312,13 +293,13 @@ bool Module::configure (yarp::os::ResourceFinder &rf)
     imod->setControlModes(ctrlModes.data());
 
     //compute QP quantities
-    hessian.resize(kinDynModel.getNrOfDegreesOfFreedom() + 6, kinDynModel.getNrOfDegreesOfFreedom() + 6);
-    hessianDense.resize(kinDynModel.getNrOfDegreesOfFreedom() + 6, kinDynModel.getNrOfDegreesOfFreedom() + 6);
-    linearMatrix.resize(6, kinDynModel.getNrOfDegreesOfFreedom() + 6);
-    linearMatrixDense.resize(6 + kinDynModel.getNrOfDegreesOfFreedom(), kinDynModel.getNrOfDegreesOfFreedom() + 6);
-    gradient.resize(kinDynModel.getNrOfDegreesOfFreedom() + 6);
-    lowerBound.resize(6 + kinDynModel.getNrOfDegreesOfFreedom());
-    upperBound.resize(6 + kinDynModel.getNrOfDegreesOfFreedom());
+    hessian.resize(robot.getNrOfDegreesOfFreedom() + 6, robot.getNrOfDegreesOfFreedom() + 6);
+    hessianDense.resize(robot.getNrOfDegreesOfFreedom() + 6, robot.getNrOfDegreesOfFreedom() + 6);
+    linearMatrix.resize(6, robot.getNrOfDegreesOfFreedom() + 6);
+    linearMatrixDense.resize(6 + robot.getNrOfDegreesOfFreedom(), robot.getNrOfDegreesOfFreedom() + 6);
+    gradient.resize(robot.getNrOfDegreesOfFreedom() + 6);
+    lowerBound.resize(6 + robot.getNrOfDegreesOfFreedom());
+    upperBound.resize(6 + robot.getNrOfDegreesOfFreedom());
 
     hessianDense.setZero();
     linearMatrixDense.setZero();
@@ -327,8 +308,8 @@ bool Module::configure (yarp::os::ResourceFinder &rf)
     upperBound.setZero();
 
     //compute J_ee_pos
-    J_ee_pos.resize(3, kinDynModel.getNrOfDegreesOfFreedom() + 6);
-    J_ee_pos = iDynTree::toEigen(robot.getJacobian(frameName_ee)).block(0, 0, 3, kinDynModel.getNrOfDegreesOfFreedom() + 6);
+    J_ee_pos.resize(3, robot.getNrOfDegreesOfFreedom() + 6);
+    J_ee_pos = iDynTree::toEigen(robot.getJacobian(frameName_ee)).block(0, 0, 3, robot.getNrOfDegreesOfFreedom() + 6);
     //compute w_p_ee
     w_p_ee = robot.getWorldTransform(frameName_ee).getPosition();
     //set w_p_ee_des
