@@ -3,11 +3,13 @@
 
 #include <cmath>
 
+#include <cstdlib>
 #include <iDynTree/Core/MatrixFixSize.h>
 #include <iDynTree/Core/Transform.h>
 #include <iDynTree/Core/Twist.h>
 #include <iostream>
 #include <yarp/dev/IControlMode.h>
+#include <yarp/os/Log.h>
 #include <yarp/os/ResourceFinder.h>
 #include <yarp/os/Property.h>
 #include <yarp/sig/Vector.h>
@@ -91,51 +93,27 @@ bool Module::updateModule ()
     iDynTree::Transform w_H_b = iDynTree::Transform::Identity(); //identity + zero vector
     iDynTree::Twist baseVel = iDynTree::Twist::Zero();
 
+    // Set the robot state
     robot.setState(w_H_b,baseVel, positionsInRad, velocitiesInRadS);
-
-    //compute J_ee_pos
-    J_ee_pos.resize(3, robot.getNrOfDegreesOfFreedom() + 6);
-    J_ee_pos = iDynTree::toEigen(robot.getJacobian(frameName_ee)).block(0, 0, 3, robot.getNrOfDegreesOfFreedom() + 6);
-    //compute w_p_ee
-    w_p_ee = robot.getWorldTransform(frameName_ee).getPosition();
-
-
-    qp_problem.computeHessian(hessianDense, J_ee_pos, 1);
-    qp_problem.computeGradient(gradient, J_ee_pos, w_p_ee - w_p_ee_des);
-    qp_problem.computeLinearConstraintsMatrix(linearMatrixDense, robot.getJacobian(frameName_base));
-    qp_problem.computeBounds(lowerBound, upperBound, 0.10);
-
-    hessian = hessianDense.sparseView();
-    linearMatrix = linearMatrixDense.sparseView();
-
-    if (!solver.updateHessianMatrix(hessian))
-        return false;
-    if (!solver.updateGradient(gradient))
-        return false;
-    if (!solver.updateLinearConstraintsMatrix(linearMatrix))
-        return false;
-    if (!solver.updateBounds(lowerBound, upperBound))
-        return false;
-    if (solver.solveProblem() != OsqpEigen::ErrorExitFlag::NoError)
-        return false;
+    // solve QP
+    qp_problem.update(robot);
+    qp_problem.solve();
 
     // Link yarp and eigen QP output vectors using the Eigen Map
     Eigen::Map<Eigen::VectorXd> outputQP = iDynTree::toEigen(outputQP_yarp);
-    outputQP = solver.getSolution();
+    outputQP = qp_problem.getSolution();
 
-    // std::cout << "outputQP: " << outputQP << std::endl;
-    // std::cout << "outputQP_yarp: " << outputQP_yarp.toString() << std::endl;
-    
-    //compute control
+    //evaluate reference joint positions
     referenceJointVelocities = outputQP_yarp.subVector(6, robot.getNrOfDegreesOfFreedom() + 6 - 1) * 180.0 / M_PI;
     for (size_t i = 0; i < positionsInRad.size(); i++) {
         referenceJointPositions(i) = old_referenceJointPositions(i) + referenceJointVelocities(i) *  Module::getPeriod();
     }
 
-    std::cout << "error pos" << (w_p_ee - w_p_ee_des).toString() << " norm: " << iDynTree::toEigen(w_p_ee - w_p_ee_des).norm() << std::endl;
-
     ipos->setPositions(referenceJointPositions.data());
     copyYarpVector(referenceJointPositions, old_referenceJointPositions);
+
+    iDynTree::Position w_deltaP_ee = robot.getWorldTransform(frameName_ee).getPosition() - w_p_ee_des;
+    yInfo() << "error pos" << w_deltaP_ee.toString() << " norm: " << iDynTree::toEigen(w_deltaP_ee).norm();
 
     return true;
 }
@@ -207,12 +185,10 @@ bool Module::configure (yarp::os::ResourceFinder &rf)
     Property & remoteControlBoardsOpts = options.addGroup("REMOTE_CONTROLBOARD_OPTIONS");
     remoteControlBoardsOpts.put("writeStrict","on");
 
-    size_t actuatedDOFs = axesList.size();
-
     // Actually open the device
     bool ok = robotDevice.open(options);
     if (!ok) {
-        std::cout << "Could not open remotecontrolboardremapper object.\n";
+        yError() << "Could not open remotecontrolboardremapper object.\n";
         return false;
     }
 
@@ -247,16 +223,15 @@ bool Module::configure (yarp::os::ResourceFinder &rf)
     //// Resize buffers
     ///////////////////////////////////////////////////////////////
 
-    std::cout << "Number of DOFs: " << actuatedDOFs << "\n";
+    yInfo() << "Number of DOFs: " << robot.getNrOfDegreesOfFreedom();
 
-    referenceJointPositions.resize(actuatedDOFs, 0.0); // deg
-    referenceJointVelocities.resize(actuatedDOFs, 0.0); // deg/s
-    zeroJointPositions.resize(actuatedDOFs, 0.0); // deg
-    old_referenceJointPositions.resize(actuatedDOFs, 0.0); // deg
-    positionsInDeg.resize(actuatedDOFs, 0.0);
-    positionsInRad.resize(actuatedDOFs, 0.0);
-    velocitiesInDegS.resize(actuatedDOFs, 0.0);
-    velocitiesInRadS.resize(actuatedDOFs, 0.0);
+    referenceJointPositions.resize(robot.getNrOfDegreesOfFreedom(), 0.0); // deg
+    referenceJointVelocities.resize(robot.getNrOfDegreesOfFreedom(), 0.0); // deg/s
+    old_referenceJointPositions.resize(robot.getNrOfDegreesOfFreedom(), 0.0); // deg
+    positionsInDeg.resize(robot.getNrOfDegreesOfFreedom(), 0.0);
+    positionsInRad.resize(robot.getNrOfDegreesOfFreedom(), 0.0);
+    velocitiesInDegS.resize(robot.getNrOfDegreesOfFreedom(), 0.0);
+    velocitiesInRadS.resize(robot.getNrOfDegreesOfFreedom(), 0.0);
 
     // Make sure that we are reading data from the robot before proceeding
     bool readEncoderSuccess = false;
@@ -277,73 +252,30 @@ bool Module::configure (yarp::os::ResourceFinder &rf)
     convertDegToRad(velocitiesInDegS, velocitiesInRadS);
     iDynTree::Transform w_H_b = iDynTree::Transform::Identity(); //identity + zero vector
     iDynTree::Twist baseVel = iDynTree::Twist::Zero();
-
+    // Set the robot state
     robot.setState(w_H_b, baseVel, positionsInRad, velocitiesInRadS);
-
-    //write
-    time_zero = yarp::os::Time::now();
-
-    copyYarpVector(positionsInDeg, zeroJointPositions);
-    copyYarpVector(positionsInDeg, old_referenceJointPositions);
-
-
-    // Setting the control mode of all the controlled joints to torque control mode
-    // See http://wiki.icub.org/wiki/Control_Modes for more info about the control modes
-    std::vector<int> ctrlModes(actuatedDOFs, VOCAB_CM_POSITION_DIRECT);
-    imod->setControlModes(ctrlModes.data());
-
-    //compute QP quantities
-    hessian.resize(robot.getNrOfDegreesOfFreedom() + 6, robot.getNrOfDegreesOfFreedom() + 6);
-    hessianDense.resize(robot.getNrOfDegreesOfFreedom() + 6, robot.getNrOfDegreesOfFreedom() + 6);
-    linearMatrix.resize(6, robot.getNrOfDegreesOfFreedom() + 6);
-    linearMatrixDense.resize(6 + robot.getNrOfDegreesOfFreedom(), robot.getNrOfDegreesOfFreedom() + 6);
-    gradient.resize(robot.getNrOfDegreesOfFreedom() + 6);
-    lowerBound.resize(6 + robot.getNrOfDegreesOfFreedom());
-    upperBound.resize(6 + robot.getNrOfDegreesOfFreedom());
-
-    hessianDense.setZero();
-    linearMatrixDense.setZero();
-    gradient.setZero();
-    lowerBound.setZero();
-    upperBound.setZero();
 
     //compute J_ee_pos
     J_ee_pos.resize(3, robot.getNrOfDegreesOfFreedom() + 6);
     J_ee_pos = iDynTree::toEigen(robot.getJacobian(frameName_ee)).block(0, 0, 3, robot.getNrOfDegreesOfFreedom() + 6);
     //compute w_p_ee
-    w_p_ee = robot.getWorldTransform(frameName_ee).getPosition();
-    //set w_p_ee_des
+    iDynTree::Position w_p_ee = robot.getWorldTransform(frameName_ee).getPosition();
     w_p_ee_des = iDynTree::Position(w_p_ee(0) + 0.2, 0.0, w_p_ee(2) + 0.2);
 
-    std::cout << "error pos" << (w_p_ee - w_p_ee_des).toString() << " norm: " << iDynTree::toEigen(w_p_ee - w_p_ee_des).norm() << std::endl;
+    yInfo() << "error pos" << (w_p_ee - w_p_ee_des).toString() << " norm: " << iDynTree::toEigen(w_p_ee - w_p_ee_des).norm();
 
+    // configure QP
+    qp_problem.setDesiredFramePosition(w_p_ee_des, frameName_ee);
+    qp_problem.configure(robot);
+    outputQP_yarp.resize(robot.getNrOfDegreesOfFreedom() + 6);
 
-    qp_problem.computeHessian(hessianDense, J_ee_pos,  0.0);
-    qp_problem.computeGradient(gradient, J_ee_pos, w_p_ee - w_p_ee_des);
-    qp_problem.computeLinearConstraintsMatrix(linearMatrixDense, robot.getJacobian(frameName_base));
-    qp_problem.computeBounds(lowerBound, upperBound, 0.0);
+    // init old_referenceJointPositions
+    copyYarpVector(positionsInDeg, old_referenceJointPositions);
 
-    hessian = hessianDense.sparseView();
-    linearMatrix = linearMatrixDense.sparseView();
-
-    solver.settings()->setWarmStart(true);
-    solver.settings()->setVerbosity(false);
-    solver.data()->setNumberOfVariables(gradient.size());
-    solver.data()->setNumberOfConstraints(lowerBound.size());
-    if (!solver.data()->setHessianMatrix(hessian))
-        return false;
-    if (!solver.data()->setGradient(gradient))
-        return false;
-    if (!solver.data()->setLinearConstraintsMatrix(linearMatrix))
-        return false;
-    if (!solver.data()->setLowerBound(lowerBound))
-        return false;
-    if (!solver.data()->setUpperBound(upperBound))
-        return false;
-    if (!solver.initSolver())
-        return false;
-
-    outputQP_yarp.resize(gradient.size());
+    // Setting the control mode of all the controlled joints to torque control mode
+    // See http://wiki.icub.org/wiki/Control_Modes for more info about the control modes
+    std::vector<int> ctrlModes(robot.getNrOfDegreesOfFreedom(), VOCAB_CM_POSITION_DIRECT);
+    imod->setControlModes(ctrlModes.data());
 
     return true;
 }

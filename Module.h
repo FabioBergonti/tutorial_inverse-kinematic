@@ -44,27 +44,14 @@ class Module : public yarp::os::RFModule
     //write
     yarp::sig::Vector referenceJointPositions; // deg
     yarp::sig::Vector referenceJointVelocities; // deg/s
-    yarp::sig::Vector zeroJointPositions; // deg
     yarp::sig::Vector old_referenceJointPositions; // deg
-    double time_zero;
 
     iDynTree::MatrixDynSize J_ee_pos;
-    iDynTree::Position w_p_ee;
     iDynTree::Position w_p_ee_des;
 
     const std::string frameName_base {"base_link"};
     const std::string frameName_ee {"r_arm_jet_turbine"};
 
-    Eigen::SparseMatrix<double> hessian;
-    Eigen::SparseMatrix<double> linearMatrix;
-    Eigen::MatrixXd hessianDense;
-    Eigen::MatrixXd linearMatrixDense;
-    Eigen::VectorXd gradient;
-    Eigen::VectorXd lowerBound;
-    Eigen::VectorXd upperBound;
-
-    // Instantiate OSQP solver
-    OsqpEigen::Solver solver;
     QPControlProblem qp_problem;
 
     Robot robot;

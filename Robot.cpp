@@ -23,7 +23,7 @@ bool Robot::configure(std::string modelFullPath, std::vector<std::string> axesLi
     }
 
     const iDynTree::Model& model = _kinDynModel.model();
-    std::cout << "Robot configure" << std::endl;
+    yInfo() << "Robot configure";
 
     n_dof = axesList.size();
     if (n_dof != model.getNrOfDOFs()) {
@@ -42,7 +42,6 @@ bool Robot::configure(std::string modelFullPath, std::vector<std::string> axesLi
 
 bool Robot::setState(iDynTree::Transform w_H_b, iDynTree::Twist baseVel, yarp::sig::Vector positionsInRad, yarp::sig::Vector velocitiesInRadS)
 {
-    std::cout << "Robot setState" << std::endl;
     iDynTree::toiDynTree(positionsInRad, _jointPos);
     iDynTree::toiDynTree(velocitiesInRadS, _jointVel);
     _w_H_b = w_H_b;

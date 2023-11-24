@@ -1,4 +1,5 @@
 #include "Module.h"
+#include <yarp/os/Log.h>
 #include <yarp/os/Network.h>
 #include <cstdlib>
 
@@ -10,7 +11,7 @@ int main(int argc, char **argv)
     yarp::os::Network yarp;
 
     if (!yarp::os::Network::checkNetwork(5.0)) {
-        std::cout << "Yarp network not found\n";
+        yError() << "Yarp network not found\n";
         return EXIT_FAILURE;
     }
 
