@@ -43,3 +43,5 @@ yarpmanager
 ```
 - open the application `tutorial_inverse-kinematic-system.xml` in yarpmanager and run all the modules
 - open the application `tutorial_inverse-kinematic-app.xml` in yarpmanager and run the controller
+
+https://github.com/FabioBergonti/tutorial_inverse-kinematic/assets/38210073/19d25541-a3d8-4037-8abe-c938127b8c4d
