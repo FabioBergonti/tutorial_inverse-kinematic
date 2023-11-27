@@ -10,10 +10,10 @@ bool QPControlProblem::configure(Robot& robot)
     _upperBound.resize(0);
     _count_constraints = 0;
 
-    _minimiseConfigurationVelocity(robot, 1, true);
-    _minimiseErrorDesiredConfigurationVelocity(robot, 1, true);
-    _constraintBaseVel(robot, true);
-    _boundJointVel(robot, 0.10, true);
+    _minimiseConfigurationVelocity(robot, 1);
+    _minimiseErrorDesiredConfigurationVelocity(robot, 1);
+    _constraintBaseVel(robot);
+    _boundJointVel(robot, 0.10);
 
     _n_constraints = _count_constraints;
 
@@ -22,6 +22,7 @@ bool QPControlProblem::configure(Robot& robot)
     _solver.data()->setNumberOfVariables(_n_var);
     _solver.data()->setNumberOfConstraints(_n_constraints);
     _outputQP = Eigen::VectorXd::Zero(_n_var);
+    _configure_qp_problem = false;
     return true;
 }
 
@@ -89,9 +90,9 @@ bool QPControlProblem::setDesiredFramePosition(iDynTree::Position w_p_ee_des, st
     return true;
 }
 
-bool QPControlProblem::_minimiseConfigurationVelocity(Robot& robot, const double gain, const bool configure)
+bool QPControlProblem::_minimiseConfigurationVelocity(Robot& robot, const double gain)
 {
-    if (configure){
+    if (_configure_qp_problem){
         yInfo() << "QPControlProblem::_minimiseConfigurationVelocity: configuring";
     }
     _hessian += gain * Eigen::MatrixXd::Identity(_n_var,_n_var);
@@ -99,9 +100,9 @@ bool QPControlProblem::_minimiseConfigurationVelocity(Robot& robot, const double
     return true;
 }
 
-bool QPControlProblem::_minimiseErrorDesiredConfigurationVelocity(Robot& robot, const double gain, const bool configure)
+bool QPControlProblem::_minimiseErrorDesiredConfigurationVelocity(Robot& robot, const double gain)
 {
-    if (configure){
+    if (_configure_qp_problem){
     yInfo() << "QPControlProblem::_minimiseConfigurationVelocity: configuring";
     _J_ee_pos.resize(3, robot.getNrOfDegreesOfFreedom() + 6);
     }
@@ -112,9 +113,9 @@ bool QPControlProblem::_minimiseErrorDesiredConfigurationVelocity(Robot& robot, 
     return true;
 }
 
-bool QPControlProblem::_constraintBaseVel(Robot& robot, const bool configure)
+bool QPControlProblem::_constraintBaseVel(Robot& robot)
 {
-    if (configure){
+    if (_configure_qp_problem){
         yInfo() << "QPControlProblem::_constraintBaseVel: configuring";
         _linearMatrix.conservativeResize(_count_constraints + 6, Eigen::NoChange);
         _lowerBound.conservativeResize(_count_constraints + 6);
@@ -128,9 +129,9 @@ bool QPControlProblem::_constraintBaseVel(Robot& robot, const bool configure)
     return true;
 }
 
-bool QPControlProblem::_boundJointVel(Robot& robot, const double speed_limit, const bool configure)
+bool QPControlProblem::_boundJointVel(Robot& robot, const double speed_limit)
 {
-    if (configure){
+    if (_configure_qp_problem){
         yInfo() << "QPControlProblem::_boundJointVel: configuring";
         _linearMatrix.conservativeResize(_count_constraints + robot.getNrOfDegreesOfFreedom(), Eigen::NoChange);
         _lowerBound.conservativeResize(_count_constraints + robot.getNrOfDegreesOfFreedom());

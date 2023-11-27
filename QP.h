@@ -23,13 +23,15 @@ class QPControlProblem
 
     private:
         // Robot _robot;
-        bool _minimiseConfigurationVelocity(Robot& robot, const double gain=1, const bool configure=false);
-        bool _minimiseErrorDesiredConfigurationVelocity(Robot& robot, const double gain=1, const bool configure=false);
-        bool _constraintBaseVel(Robot& robot, const bool configure=false);
-        bool _boundJointVel(Robot& robot, const double speed_limit, const bool configure=false);
+        bool _minimiseConfigurationVelocity(Robot& robot, const double gain=1);
+        bool _minimiseErrorDesiredConfigurationVelocity(Robot& robot, const double gain=1);
+        bool _constraintBaseVel(Robot& robot);
+        bool _boundJointVel(Robot& robot, const double speed_limit);
 
         std::string _frameName_base {"base_link"};
         std::string _frameName_ee;
+
+        bool _configure_qp_problem {true};
 
         unsigned int _n_var;
         unsigned int _n_constraints;
