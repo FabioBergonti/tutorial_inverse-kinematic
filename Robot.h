@@ -21,9 +21,7 @@
 class Robot
 {
     public:
-        Robot(){
-            std::cout << "Robot constructor" << std::endl;
-        }
+        Robot(){}
         bool configure(std::string modelFullPath, std::vector<std::string> axesList, iDynTree::Vector3 gravity);
         bool setState(iDynTree::Transform w_H_b, iDynTree::Twist baseVel, yarp::sig::Vector positionsInRad, yarp::sig::Vector velocitiesInRadS);
 
@@ -41,6 +39,7 @@ class Robot
         iDynTree::Twist getBaseVel(){return _baseVel;}
         iDynTree::MatrixDynSize getJacobian(std::string frameName);
         iDynTree::Transform getWorldTransform(std::string frameName);
+        unsigned int getNrOfDegreesOfFreedom(){return _kinDynModel.getNrOfDegreesOfFreedom();};
 
 
     private:
