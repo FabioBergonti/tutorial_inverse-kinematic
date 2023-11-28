@@ -20,7 +20,7 @@ include(ICUBcontribOptions)
 # specify to install in $ICUBcontrib_DIR/bin
 icubcontrib_set_default_prefix()
 
-add_executable(${PROJECT_NAME} main.cpp Module.cpp QP.cpp Robot.cpp)
+add_executable(${PROJECT_NAME} main.cpp Module.cpp QP.cpp Constraint.cpp Robot.cpp)
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${YARP_LIBRARIES} ${iDynTree_LIBRARIES} OsqpEigen::OsqpEigen)
 

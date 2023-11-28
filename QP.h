@@ -8,7 +8,8 @@
 #include <Robot.h>
 #include <string>
 #include <yarp/os/LogStream.h>
-
+#include <vector>
+#include <Constraint.h>
 
 class QPControlProblem
 {
@@ -40,6 +41,8 @@ class QPControlProblem
         iDynTree::Position _w_p_ee;
         iDynTree::Position _w_p_ee_des;
 
+        std::vector<std::unique_ptr<Constraint>> _list_constraints;
+
         Eigen::MatrixXd _hessian;
         Eigen::VectorXd _gradient;
         Eigen::MatrixXd _linearMatrix;
@@ -53,6 +56,22 @@ class QPControlProblem
 
 };
 
+class ConstraintBaseVel : public Constraint{
+    public:
+        ConstraintBaseVel(unsigned int n_var) : Constraint(n_var, 6) {
+            // Additional initialization for ConstraintBaseVel if needed
+        }
+        bool evaluate(Robot& robot, Eigen::Ref<Eigen::MatrixXd> linearMatrix, Eigen::Ref<Eigen::VectorXd> lowerBound, Eigen::Ref<Eigen::VectorXd> upperBound, unsigned int& count_constraints) override;
+};
 
+class ConstraintJointVel : public Constraint
+{
+    public:
+        ConstraintJointVel(unsigned int n_var, unsigned int n_dof) : Constraint(n_var, n_dof) {
+            // Additional initialization for ConstraintJointVel if needed
+        }
+        bool evaluate(Robot& robot, Eigen::Ref<Eigen::MatrixXd> linearMatrix, Eigen::Ref<Eigen::VectorXd> lowerBound, Eigen::Ref<Eigen::VectorXd> upperBound, unsigned int& count_constraints) override;
+        double speed_limit {0.10};
+};
 
 #endif /* end of include guard QP_MODULE_H */

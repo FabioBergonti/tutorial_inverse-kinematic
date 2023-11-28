@@ -3,20 +3,30 @@
 bool QPControlProblem::configure(Robot& robot)
 {
     _n_var = robot.getNrOfDegreesOfFreedom() + 6;
-    _hessian.resize(_n_var, _n_var);
-    _gradient.resize(_n_var);
     _linearMatrix.resize(0, _n_var);
     _lowerBound.resize(0);
     _upperBound.resize(0);
-    _count_constraints = 0;
+    
 
+    _list_constraints.emplace_back(std::make_unique<ConstraintBaseVel>(_n_var));
+    _list_constraints.emplace_back(std::make_unique<ConstraintJointVel>(_n_var, robot.getNrOfDegreesOfFreedom()));
+
+    _count_constraints = 0;
+    for (auto& constraint : _list_constraints){
+        constraint->init(robot, _linearMatrix, _lowerBound, _upperBound, _count_constraints);
+    }
+    _count_constraints = 0;
+    for (auto& constraint : _list_constraints){
+        constraint->evaluate(robot, _linearMatrix, _lowerBound, _upperBound, _count_constraints);
+    }
+
+    _hessian.resize(_n_var, _n_var);
+    _gradient.resize(_n_var);
     _minimiseConfigurationVelocity(robot, 1);
     _minimiseErrorDesiredConfigurationVelocity(robot, 1);
-    _constraintBaseVel(robot);
-    _boundJointVel(robot, 0.10);
+
 
     _n_constraints = _count_constraints;
-
     _solver.settings()->setWarmStart(true);
     _solver.settings()->setVerbosity(false);
     _solver.data()->setNumberOfVariables(_n_var);
@@ -30,12 +40,17 @@ bool QPControlProblem::update(Robot& robot)
 {
     _hessian.setZero();
     _gradient.setZero();
-    _count_constraints = 0;
 
     _minimiseConfigurationVelocity(robot, 1);
     _minimiseErrorDesiredConfigurationVelocity(robot, 1);
-    _constraintBaseVel(robot);
-    _boundJointVel(robot, 0.10);
+
+    _count_constraints = 0;
+    for (auto& constraint : _list_constraints){
+        constraint->evaluate(robot, _linearMatrix, _lowerBound, _upperBound, _count_constraints);
+    }
+
+    // compute the difference between the two linear matrices
+
 
     return true;
 }
@@ -113,36 +128,16 @@ bool QPControlProblem::_minimiseErrorDesiredConfigurationVelocity(Robot& robot, 
     return true;
 }
 
-bool QPControlProblem::_constraintBaseVel(Robot& robot)
-{
-    if (_configure_qp_problem){
-        yInfo() << "QPControlProblem::_constraintBaseVel: configuring";
-        _linearMatrix.conservativeResize(_count_constraints + 6, Eigen::NoChange);
-        _lowerBound.conservativeResize(_count_constraints + 6);
-        _upperBound.conservativeResize(_count_constraints + 6);
-        _linearMatrix.block(_count_constraints, 0, 6, _n_var) = Eigen::MatrixXd::Zero(6, _n_var);
-        _lowerBound.segment(_count_constraints, 6) = Eigen::VectorXd::Zero(6);
-        _upperBound.segment(_count_constraints, 6) = Eigen::VectorXd::Zero(6);
-    }
-    _linearMatrix.block(_count_constraints, 0, 6, _n_var) = iDynTree::toEigen(robot.getJacobian(_frameName_base));
-    _count_constraints += 6;
+bool ConstraintBaseVel::evaluate(Robot& robot, Eigen::Ref<Eigen::MatrixXd> linearMatrix, Eigen::Ref<Eigen::VectorXd> lowerBound, Eigen::Ref<Eigen::VectorXd> upperBound, unsigned int& count_constraints){
+    linearMatrix.block(count_constraints, 0, _n_constraints, _n_var) = iDynTree::toEigen(robot.getJacobian("base_link"));
+    count_constraints += _n_constraints;
     return true;
-}
+};
 
-bool QPControlProblem::_boundJointVel(Robot& robot, const double speed_limit)
-{
-    if (_configure_qp_problem){
-        yInfo() << "QPControlProblem::_boundJointVel: configuring";
-        _linearMatrix.conservativeResize(_count_constraints + robot.getNrOfDegreesOfFreedom(), Eigen::NoChange);
-        _lowerBound.conservativeResize(_count_constraints + robot.getNrOfDegreesOfFreedom());
-        _upperBound.conservativeResize(_count_constraints + robot.getNrOfDegreesOfFreedom());
-        _linearMatrix.block(_count_constraints, 0, robot.getNrOfDegreesOfFreedom(), _n_var) = Eigen::MatrixXd::Zero(robot.getNrOfDegreesOfFreedom(), _n_var);
-        _lowerBound.segment(_count_constraints, robot.getNrOfDegreesOfFreedom()) = Eigen::VectorXd::Zero(robot.getNrOfDegreesOfFreedom());
-        _upperBound.segment(_count_constraints, robot.getNrOfDegreesOfFreedom()) = Eigen::VectorXd::Zero(robot.getNrOfDegreesOfFreedom());
-    }
-    _linearMatrix.block(_count_constraints, 6, robot.getNrOfDegreesOfFreedom(), robot.getNrOfDegreesOfFreedom()) = Eigen::MatrixXd::Identity(robot.getNrOfDegreesOfFreedom(), robot.getNrOfDegreesOfFreedom());
-    _lowerBound.segment(_count_constraints, robot.getNrOfDegreesOfFreedom()) = - speed_limit * Eigen::VectorXd::Ones(robot.getNrOfDegreesOfFreedom());
-    _upperBound.segment(_count_constraints, robot.getNrOfDegreesOfFreedom()) = speed_limit * Eigen::VectorXd::Ones(robot.getNrOfDegreesOfFreedom()); 
-    _count_constraints += robot.getNrOfDegreesOfFreedom();  
+bool ConstraintJointVel::evaluate(Robot& robot, Eigen::Ref<Eigen::MatrixXd> linearMatrix, Eigen::Ref<Eigen::VectorXd> lowerBound, Eigen::Ref<Eigen::VectorXd> upperBound, unsigned int& count_constraints){
+    linearMatrix.block(count_constraints, 6, _n_constraints, _n_constraints) = Eigen::MatrixXd::Identity(_n_constraints, _n_constraints);
+    lowerBound.segment(count_constraints, _n_constraints) = - speed_limit * Eigen::VectorXd::Ones(_n_constraints);
+    upperBound.segment(count_constraints, _n_constraints) = speed_limit * Eigen::VectorXd::Ones(_n_constraints); 
+    count_constraints += _n_constraints;
     return true;
-}
+};
