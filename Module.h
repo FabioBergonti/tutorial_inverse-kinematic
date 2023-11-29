@@ -1,6 +1,7 @@
 #ifndef MODULE_H
 #define MODULE_H
 
+#include "QPInverseKinematics.h"
 #include <iDynTree/Core/MatrixDynSize.h>
 #include <iDynTree/Core/Position.h>
 #include <iDynTree/Core/VectorDynSize.h>
@@ -52,7 +53,7 @@ class Module : public yarp::os::RFModule
     const std::string frameName_base {"base_link"};
     const std::string frameName_ee {"r_arm_jet_turbine"};
 
-    QPControlProblem qp_problem;
+    QPInverseKinematics qp_problem;
 
     Robot robot;
 

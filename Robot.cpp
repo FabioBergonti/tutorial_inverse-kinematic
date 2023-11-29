@@ -34,8 +34,8 @@ bool Robot::configure(std::string modelFullPath, std::vector<std::string> axesLi
     _jointPos.resize(n_dof);
     _jointVel.resize(n_dof);
 
-    _initJacobian();
-    _initTransform();
+    _configureJacobian();
+    _configureTransform();
 
     return true;
 }
@@ -54,7 +54,7 @@ bool Robot::setState(iDynTree::Transform w_H_b, iDynTree::Twist baseVel, yarp::s
 
 // Jacobian
 
-bool Robot::_initJacobian()
+bool Robot::_configureJacobian()
 {
     for (auto frame : _list_jacobian_frames){
         _jacobian[frame].resize(6, n_dof + 6);
@@ -87,7 +87,7 @@ iDynTree::MatrixDynSize Robot::getJacobian(std::string frameName)
 
 // Transform
 
-bool Robot::_initTransform()
+bool Robot::_configureTransform()
 {
     for (auto frame : _list_world_transform_frames){
         _world_transform[frame] = iDynTree::Transform::Identity();

@@ -4,10 +4,10 @@ Cost::Cost(unsigned int n_var){
     _n_var = n_var;
 };
 
-bool Cost::init(Robot& robot){
+bool Cost::configure(Robot& robot){
     return true;
 };
 
-bool Cost::evaluate(Robot& robot, Eigen::Ref<Eigen::MatrixXd> hessian, Eigen::Ref<Eigen::VectorXd> gradient){
+bool Cost::compute(Robot& robot, Eigen::Ref<Eigen::MatrixXd> hessian, Eigen::Ref<Eigen::VectorXd> gradient){
     return true;
 };
