@@ -1,7 +1,7 @@
 #ifndef QPIK_MODULE_H
 #define QPIK_MODULE_H
 
-#include <QP.h>
+#include <QPMasterClass.h>
 #include <Eigen/Dense>
 #include <OsqpEigen/OsqpEigen.h>
 #include <iDynTree/KinDynComputations.h>
@@ -14,7 +14,7 @@
 #include <Cost.h>
 
 
-class QPInverseKinematics : public QPBaseClass
+class QPInverseKinematics : public QPMasterClass
 {
     public:
         QPInverseKinematics(){};

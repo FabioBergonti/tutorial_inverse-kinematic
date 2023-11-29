@@ -12,10 +12,10 @@
 #include <Constraint.h>
 #include <Cost.h>
 
-class QPBaseClass
+class QPMasterClass
 {
     public:
-        QPBaseClass(){};
+        QPMasterClass(){};
         bool update(Robot& robot);
         bool configure(Robot& robot);
         bool solve();

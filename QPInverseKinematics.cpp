@@ -19,6 +19,8 @@ bool QPInverseKinematics::setDesiredFramePosition(iDynTree::Position w_p_ee_des,
     return true;
 }
 
+// Constraints and Costs classes used in the QP
+
 bool ConstraintBaseVel::compute(Robot& robot, Eigen::Ref<Eigen::MatrixXd> linearMatrix, Eigen::Ref<Eigen::VectorXd> lowerBound, Eigen::Ref<Eigen::VectorXd> upperBound, unsigned int& count_constraints){
     linearMatrix.block(count_constraints, 0, _n_constraints, _n_var) = iDynTree::toEigen(robot.getJacobian("base_link"));
     count_constraints += _n_constraints;

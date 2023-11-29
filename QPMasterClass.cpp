@@ -1,13 +1,13 @@
-#include <QP.h>
+#include <QPMasterClass.h>
 
-bool QPBaseClass::_setCostAndConstraints(Robot& robot){
+bool QPMasterClass::_setCostAndConstraints(Robot& robot){
     _n_var = 0;
     _list_constraints.clear();
     _list_costs.clear();
     return true;
 };
 
-bool QPBaseClass::configure(Robot& robot)
+bool QPMasterClass::configure(Robot& robot)
 {
 
     _setCostAndConstraints(robot);
@@ -43,7 +43,7 @@ bool QPBaseClass::configure(Robot& robot)
     return true;
 }
 
-bool QPBaseClass::update(Robot& robot)
+bool QPMasterClass::update(Robot& robot)
 {
     _hessian.setZero();
     _gradient.setZero();
@@ -57,13 +57,13 @@ bool QPBaseClass::update(Robot& robot)
     return true;
 }
 
-bool QPBaseClass::solve()
+bool QPMasterClass::solve()
 {
     _hessianSparse = _hessian.sparseView();
     _linearMatrixSparse = _linearMatrix.sparseView();
 
     if (!_solver.isInitialized()){
-        yInfo() << "QPBaseClass::solve: initialising solver";
+        yInfo() << "QPMasterClass::solve: initialising solver";
         if (!_solver.data()->setHessianMatrix(_hessianSparse))
             return false;
         if (!_solver.data()->setGradient(_gradient))
@@ -78,7 +78,7 @@ bool QPBaseClass::solve()
             return false;
     }
     else {
-        // yInfo() << "QPBaseClass::solve: updating solver";
+        // yInfo() << "QPMasterClass::solve: updating solver";
         if (!_solver.updateHessianMatrix(_hessianSparse))
             return false;
         if (!_solver.updateGradient(_gradient))
@@ -94,7 +94,7 @@ bool QPBaseClass::solve()
     return true;
 }
 
-Eigen::VectorXd QPBaseClass::getSolution()
+Eigen::VectorXd QPMasterClass::getSolution()
 {
     return _outputQP;
 }

@@ -21,7 +21,7 @@
 #include <Eigen/Dense>
 #include <OsqpEigen/OsqpEigen.h>
 
-#include <QP.h>
+#include <QPMasterClass.h>
 #include <Robot.h>
 
 class Module : public yarp::os::RFModule
