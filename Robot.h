@@ -52,12 +52,12 @@ class Robot
 
 
 
-        bool _initJacobian();
+        bool _configureJacobian();
         bool _computeJacobian();
         std::unordered_map<std::string, iDynTree::MatrixDynSize> _jacobian;
         std::vector<std::string> _list_jacobian_frames {"l_arm_jet_turbine", "r_arm_jet_turbine", "base_link"};
 
-        bool _initTransform();
+        bool _configureTransform();
         bool _computeTransform();
         std::unordered_map<std::string, iDynTree::Transform> _world_transform;
         std::vector<std::string> _list_world_transform_frames {"l_arm_jet_turbine", "r_arm_jet_turbine", "base_link"};

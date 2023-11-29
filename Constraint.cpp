@@ -5,7 +5,7 @@ Constraint::Constraint(unsigned int n_var, unsigned int n_constraints){
     _n_var = n_var;
 };
 
-bool Constraint::init(Robot& robot, Eigen::MatrixXd& linearMatrix, Eigen::VectorXd& lowerBound, Eigen::VectorXd& upperBound, unsigned int& count_constraints){
+bool Constraint::configure(Robot& robot, Eigen::MatrixXd& linearMatrix, Eigen::VectorXd& lowerBound, Eigen::VectorXd& upperBound, unsigned int& count_constraints){
     linearMatrix.conservativeResize(count_constraints + _n_constraints, Eigen::NoChange);
     lowerBound.conservativeResize(count_constraints + _n_constraints);
     upperBound.conservativeResize(count_constraints + _n_constraints);
@@ -16,6 +16,6 @@ bool Constraint::init(Robot& robot, Eigen::MatrixXd& linearMatrix, Eigen::Vector
     return true;
 };
 
-bool Constraint::evaluate(Robot& robot, Eigen::Ref<Eigen::MatrixXd> linearMatrix, Eigen::Ref<Eigen::VectorXd> lowerBound, Eigen::Ref<Eigen::VectorXd> upperBound, unsigned int& count_constraints){
+bool Constraint::compute(Robot& robot, Eigen::Ref<Eigen::MatrixXd> linearMatrix, Eigen::Ref<Eigen::VectorXd> lowerBound, Eigen::Ref<Eigen::VectorXd> upperBound, unsigned int& count_constraints){
     return true;
 };
