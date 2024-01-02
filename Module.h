@@ -2,9 +2,9 @@
 #define MODULE_H
 
 #include "QPInverseKinematics.h"
-#include <iDynTree/Core/MatrixDynSize.h>
-#include <iDynTree/Core/Position.h>
-#include <iDynTree/Core/VectorDynSize.h>
+#include <iDynTree/MatrixDynSize.h>
+#include <iDynTree/Position.h>
+#include <iDynTree/VectorDynSize.h>
 #include <iDynTree/KinDynComputations.h>
 
 #include <yarp/os/RFModule.h>

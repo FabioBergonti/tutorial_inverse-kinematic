@@ -5,7 +5,7 @@
 #include <Eigen/Dense>
 #include <OsqpEigen/OsqpEigen.h>
 #include <iDynTree/KinDynComputations.h>
-#include <iDynTree/Core/EigenHelpers.h>
+#include <iDynTree/EigenHelpers.h>
 #include <Robot.h>
 #include <string>
 #include <yarp/os/LogStream.h>

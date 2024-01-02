@@ -1,18 +1,18 @@
 #ifndef ROBOT_STATE_H
 #define ROBOT_STATE_H
 
-#include <iDynTree/Core/Transform.h>
+#include <iDynTree/Transform.h>
 #include <unordered_map>
 #include <yarp/sig/Vector.h>
 
-#include <iDynTree/Core/MatrixDynSize.h>
-#include <iDynTree/Core/Position.h>
-#include <iDynTree/Core/VectorDynSize.h>
+#include <iDynTree/MatrixDynSize.h>
+#include <iDynTree/Position.h>
+#include <iDynTree/VectorDynSize.h>
 #include <iDynTree/KinDynComputations.h>
 
-#include <iDynTree/ModelIO/ModelLoader.h>
-#include <iDynTree/Model/Model.h>
-#include <iDynTree/yarp/YARPConversions.h>
+#include <iDynTree/ModelLoader.h>
+#include <iDynTree/Model.h>
+#include <iDynTree/YARPConversions.h>
 #include <yarp/os/LogStream.h>
 
 #include <cmath>
