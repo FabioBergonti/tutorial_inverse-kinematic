@@ -11,6 +11,7 @@ class Cost
         Cost(unsigned int n_var);
         virtual bool configure(Robot& robot);
         virtual bool compute(Robot& robot, Eigen::Ref<Eigen::MatrixXd> hessian, Eigen::Ref<Eigen::VectorXd> gradient);
+    protected:
         unsigned int _n_var;
 };
 

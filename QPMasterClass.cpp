@@ -28,10 +28,12 @@ bool QPMasterClass::configure(Robot& robot)
     _count_constraints = 0;
     for (auto& constraint : _list_constraints){
         constraint->configure(robot, _linearMatrix, _lowerBound, _upperBound, _count_constraints);
+        _count_constraints += constraint->getNConstraints();
     }
     _count_constraints = 0;
     for (auto& constraint : _list_constraints){
         constraint->compute(robot, _linearMatrix, _lowerBound, _upperBound, _count_constraints);
+        _count_constraints += constraint->getNConstraints();
     }
 
     _n_constraints = _count_constraints;
@@ -53,6 +55,7 @@ bool QPMasterClass::update(Robot& robot)
     _count_constraints = 0;
     for (auto& constraint : _list_constraints){
         constraint->compute(robot, _linearMatrix, _lowerBound, _upperBound, _count_constraints);
+        _count_constraints += constraint->getNConstraints();
     }
     return true;
 }

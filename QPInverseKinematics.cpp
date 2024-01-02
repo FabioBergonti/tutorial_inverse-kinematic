@@ -23,7 +23,6 @@ bool QPInverseKinematics::setDesiredFramePosition(iDynTree::Position w_p_ee_des,
 
 bool ConstraintBaseVel::compute(Robot& robot, Eigen::Ref<Eigen::MatrixXd> linearMatrix, Eigen::Ref<Eigen::VectorXd> lowerBound, Eigen::Ref<Eigen::VectorXd> upperBound, unsigned int& count_constraints){
     linearMatrix.block(count_constraints, 0, _n_constraints, _n_var) = iDynTree::toEigen(robot.getJacobian("base_link"));
-    count_constraints += _n_constraints;
     return true;
 };
 
@@ -31,7 +30,6 @@ bool ConstraintJointVel::compute(Robot& robot, Eigen::Ref<Eigen::MatrixXd> linea
     linearMatrix.block(count_constraints, 6, _n_constraints, _n_constraints) = Eigen::MatrixXd::Identity(_n_constraints, _n_constraints);
     lowerBound.segment(count_constraints, _n_constraints) = - speed_limit * Eigen::VectorXd::Ones(_n_constraints);
     upperBound.segment(count_constraints, _n_constraints) = speed_limit * Eigen::VectorXd::Ones(_n_constraints); 
-    count_constraints += _n_constraints;
     return true;
 };
 
